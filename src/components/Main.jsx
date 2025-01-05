@@ -16,6 +16,27 @@ export default function TimezoneConverter() {
     }
   }, [searchQuery]);
 
+  const resetClock = (clockId) => {
+    const clock = clocks.find(c => c.id === clockId);
+    if (!clock) return;
+
+    // Get current time in the clock's timezone
+    const currentDateTime = DateTime.local().setZone(clock.timezone.key);
+    
+    // Create updated clock with current time
+    const updatedClock = {
+      ...clock,
+      dateTime: currentDateTime,
+      displayHour: currentDateTime.toFormat(is24Hour ? 'HH' : 'hh'),
+      displayMinute: currentDateTime.toFormat('mm'),
+      isHourValid: true,
+      isMinuteValid: true
+    };
+
+    // Update all clocks based on this new time
+    updateAllClocks(updatedClock);
+  };
+
   useEffect(() => {
     // Set first clock as focused when clocks array changes
     if (clocks.length > 0 && !focusedClockId) {
@@ -251,7 +272,7 @@ export default function TimezoneConverter() {
               <div
                 key={index}
                 onClick={() => addClock(tz)}
-                className="p-3 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                className="p-3 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer dark:text-white"
               >
                 {tz.offset} {tz.value}
               </div>
@@ -262,28 +283,54 @@ export default function TimezoneConverter() {
 
 	  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {clocks.map(clock => (
-          <div 
-            key={clock.id} 
-            className={`h-40 p-4 rounded-lg relative cursor-pointer transition-all bg-gray-100 dark:bg-gray-800 ${
-              clock.id === focusedClockId
-                ? 'ring-2 ring-blue-500'
-                : ''
-            }`}
-            onClick={() => setFocusedClockId(clock.id)}
-          >
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                const newClocks = clocks.filter(cl => cl.id !== clock.id);
-                setClocks(newClocks);
-                if (clock.id === focusedClockId && newClocks.length > 0) {
-                  setFocusedClockId(newClocks[0].id);
-                }
-              }}
-              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-            >
-              ✕
-            </button>
+           <div 
+           key={clock.id} 
+           className={`h-40 p-4 rounded-lg relative cursor-pointer transition-all bg-gray-100 dark:bg-gray-800 ${
+             clock.id === focusedClockId
+               ? 'ring-2 ring-blue-500'
+               : ''
+           }`}
+           onClick={() => setFocusedClockId(clock.id)}
+         >
+           <div className="absolute top-2 right-2 flex items-center gap-2">
+             <button
+               onClick={(e) => {
+                 e.stopPropagation();
+                 resetClock(clock.id);
+               }}
+               className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 p-1"
+               title="Reset to current time"
+             >
+               <svg 
+                 xmlns="http://www.w3.org/2000/svg" 
+                 width="16" 
+                 height="16" 
+                 viewBox="0 0 24 24" 
+                 fill="none" 
+                 stroke="currentColor" 
+                 strokeWidth="2" 
+                 strokeLinecap="round" 
+                 strokeLinejoin="round"
+                 className="transform hover:rotate-180 transition-transform duration-300"
+               >
+                 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                 <path d="M3 3v5h5" />
+               </svg>
+             </button>
+             <button
+               onClick={(e) => {
+                 e.stopPropagation();
+                 const newClocks = clocks.filter(cl => cl.id !== clock.id);
+                 setClocks(newClocks);
+                 if (clock.id === focusedClockId && newClocks.length > 0) {
+                   setFocusedClockId(newClocks[0].id);
+                 }
+               }}
+               className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+             >
+               ✕
+             </button>
+           </div>
             
             <div className="mb-3 text-center h-12">
               <div className="text-sm dark:text-white">
