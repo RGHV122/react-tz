@@ -8,6 +8,33 @@ export default function TimezoneConverter() {
   const [is24Hour, setIs24Hour] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [filteredTimezones, setFilteredTimezones] = useState([]);
+  const [focusedClockId, setFocusedClockId] = useState(null);
+
+  useEffect(() => {
+    // Set first clock as focused when clocks array changes
+    if (clocks.length > 0 && !focusedClockId) {
+      setFocusedClockId(clocks[0].id);
+    }
+    // Clear focused clock if all clocks are removed
+    if (clocks.length === 0) {
+      setFocusedClockId(null);
+    }
+  }, [clocks.length]);
+
+  const getTimeOffset = (focusedClock, currentClock) => {
+    if (!focusedClock || focusedClock.id === currentClock.id) return null;
+    
+    const offsetMinutes = currentClock.dateTime.offset - focusedClock.dateTime.offset;
+    const hours = Math.floor(Math.abs(offsetMinutes) / 60);
+    const minutes = Math.abs(offsetMinutes) % 60;
+    
+    let offsetString = '';
+    if (hours > 0) offsetString += `${hours}h `;
+    if (minutes > 0) offsetString += `${minutes}m`;
+    if (!offsetString) return '±0h';
+    
+    return `${offsetMinutes >= 0 ? '+' : '-'}${offsetString}`;
+  };
 
   const handleTimeBlur = (clockId, field) => {
     const clock = clocks.find(c => c.id === clockId);
@@ -15,7 +42,6 @@ export default function TimezoneConverter() {
 
     let updatedClock = { ...clock };
     
-    // Reset to last valid time if current input is invalid
     if (field === 'hour' && !clock.isHourValid) {
       updatedClock.displayHour = clock.dateTime.toFormat(is24Hour ? 'HH' : 'hh');
       updatedClock.isHourValid = true;
@@ -154,13 +180,22 @@ export default function TimezoneConverter() {
     return false;
   };
 
+  const getGMTOffset = (dateTime) => {
+    const offsetMinutes = dateTime.offset;
+    const hours = Math.floor(Math.abs(offsetMinutes) / 60);
+    const minutes = Math.abs(offsetMinutes) % 60;
+    return `GMT${offsetMinutes >= 0 ? '+' : '-'}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+  };
+
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDarkMode);
   }, [isDarkMode]);
 
+  const focusedClock = clocks.find(c => c.id === focusedClockId);
+
   return (
     <div className="p-6 min-h-screen bg-white dark:bg-gray-900 transition-colors">
-      <div className="flex justify-between items-center mb-6">
+     <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold dark:text-white">Timezone Easy</h1>
         <div className="flex gap-4">
           <button
@@ -178,7 +213,8 @@ export default function TimezoneConverter() {
         </div>
       </div>
 
-      <div className="relative mb-6">
+
+	  <div className="relative mb-6">
         <input
           type="text"
           value={searchQuery}
@@ -201,46 +237,71 @@ export default function TimezoneConverter() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+	  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {clocks.map(clock => (
-          <div key={clock.id} className="p-6 bg-gray-100 dark:bg-gray-800 rounded-lg relative">
+          <div 
+            key={clock.id} 
+            className={`h-40 p-4 rounded-lg relative cursor-pointer transition-all bg-gray-100 dark:bg-gray-800 ${
+              clock.id === focusedClockId
+                ? 'ring-2 ring-blue-500'
+                : ''
+            }`}
+            onClick={() => setFocusedClockId(clock.id)}
+          >
             <button
-              onClick={() => setClocks(c => c.filter(cl => cl.id !== clock.id))}
+              onClick={(e) => {
+                e.stopPropagation();
+                const newClocks = clocks.filter(cl => cl.id !== clock.id);
+                setClocks(newClocks);
+                if (clock.id === focusedClockId && newClocks.length > 0) {
+                  setFocusedClockId(newClocks[0].id);
+                }
+              }}
               className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
             >
               ✕
             </button>
             
-            <div className="mb-4 text-center dark:text-white font-medium">{clock.timezone.value}</div>
+            <div className="mb-3 text-center h-12">
+              <div className="text-sm dark:text-white">
+                {clock.timezone.value} ({getGMTOffset(clock.dateTime)})
+              </div>
+              {focusedClock && clock.id !== focusedClockId && (
+                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  {getTimeOffset(focusedClock, clock)} from {focusedClock.timezone.value}
+                </div>
+              )}
+            </div>
             
-            <div className="flex gap-2 items-center">
+            <div className="flex items-center justify-center space-x-1 font-mono">
               <input
                 type="date"
                 value={clock.dateTime.toFormat('yyyy-MM-dd')}
                 onChange={(e) => handleTimeChange(clock.id, 'date', e.target.value)}
-                className="p-2 text-center rounded border dark:bg-gray-700 dark:text-white"
+                className="h-9 px-2 text-center rounded border dark:bg-gray-700 dark:text-white text-sm w-36 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
               <input
                 type="text"
                 value={clock.displayHour}
                 onChange={(e) => handleTimeChange(clock.id, 'hour', e.target.value)}
                 onBlur={() => handleTimeBlur(clock.id, 'hour')}
-                className={`w-20 p-2 text-xl text-center border rounded dark:bg-gray-700 dark:text-white 
-                  ${!clock.isHourValid ? 'border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500' : 'border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500'}`}
+                className={`h-9 w-12 px-2 text-center border rounded dark:bg-gray-700 dark:text-white focus:outline-none
+                  ${!clock.isHourValid ? 'border-red-500 focus:ring-1 focus:ring-red-500' : 'border-gray-300 focus:ring-1 focus:ring-blue-500'}`}
               />
+              <span className="text-lg dark:text-white">:</span>
               <input
                 type="text"
                 value={clock.displayMinute}
                 onChange={(e) => handleTimeChange(clock.id, 'minute', e.target.value)}
                 onBlur={() => handleTimeBlur(clock.id, 'minute')}
-                className={`w-20 p-2 text-xl text-center border rounded dark:bg-gray-700 dark:text-white
-                  ${!clock.isMinuteValid ? 'border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500' : 'border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500'}`}
+                className={`h-9 w-12 px-2 text-center border rounded dark:bg-gray-700 dark:text-white focus:outline-none
+                  ${!clock.isMinuteValid ? 'border-red-500 focus:ring-1 focus:ring-red-500' : 'border-gray-300 focus:ring-1 focus:ring-blue-500'}`}
               />
               {!is24Hour && (
                 <select
                   value={clock.dateTime.toFormat('a')}
                   onChange={(e) => handleTimeChange(clock.id, 'meridiem', e.target.value)}
-                  className="w-20 p-2 text-xl text-center rounded border dark:bg-gray-700 dark:text-white"
+                  className="h-9 w-16 px-2 text-center rounded border dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
                   <option>AM</option>
                   <option>PM</option>
