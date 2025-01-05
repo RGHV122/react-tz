@@ -1,4 +1,4 @@
-import {getTimeZoneOffsetInHours} from './timeutil.js'
+import {DateTime} from 'luxon'
 
 export const timezones = [
   {
@@ -8203,12 +8203,14 @@ export const timezones = [
     abbr: ["HAST"],
     countries: ["U.S. Outlying Islands", "United States"],
     cities: [[], []],
+    abbr:["HST"],
     tzName: "Hawaii-Aleutian Standard Time",
   },
   {
     tz: "Pacific/Johnston",
     countries: [],
     cities: [[]],
+    abbr:["HST"],
     tzName: "Hawaii-Aleutian Standard Time",
   },
   {
@@ -8448,6 +8450,7 @@ export const timezones = [
     tz: "US/Hawaii",
     countries: [],
     cities: [[]],
+    abbr:["HST"],
     tzName: "Hawaii-Aleutian Standard Time",
   },
   {
@@ -8503,25 +8506,50 @@ export const timezones = [
   },
 ];
 
-export const timezoneList = timezones.reduce((prev, curr) => {
-  var temp = curr.tzName;
-  if (curr.abbr && curr.abbr.length > 0) {
-    temp += " - " + curr.abbr.join("/");
-  }
-  temp += " - " + curr.tz;
+// export const timezoneList = timezones.map(tz => {
+//   const offset = DateTime.local().setZone(tz.tz).offset;
+//   const hours = Math.floor(Math.abs(offset) / 60);
+//   const minutes = Math.abs(offset) % 60;
+//   const offsetString = `GMT${offset >= 0 ? '+' : '-'}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 
-  var lis = [{ key: curr.tz, value: temp, offset: getTimeZoneOffsetInHours(curr.tz) }];
-  for (var i = 0; i < curr.countries.length; i++) {
+//   return {
+//     key: tz.tz,
+//     value: `${tz.tzName} - ${tz.tz}`,
+//     offset: offsetString,
+//     abbreviations: tz.abbr ?? [], // Abbreviations
+//     countries: tz.countries ??[], // Country names
+//     cities: tz.cities.flat() ?? [], // Flattened city list for searching
+//   };
+// });
+
+export const timezoneList = timezones.reduce((prev, curr) => {
+
+  const offset = DateTime.local().setZone(curr.tz).offset;
+  const hours = Math.floor(Math.abs(offset) / 60);
+  const minutes = Math.abs(offset) % 60;
+  const offsetString = `GMT${offset >= 0 ? '+' : '-'}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+
+  var lis = [
+     {
+      key: curr.tz,
+      value: `${curr.tzName} - ${curr.tz}`,
+      offset: offsetString,
+      abbreviations: curr.abbr ?? [], // Abbreviations
+      // countries: tz.countries ??[], // Country names
+      // cities: tz.cities.flat() ?? [], // Flattened city list for searching
+    }
+  ]
+  for(var i=0;i< curr.countries.length;i++){
     if (curr.cities[i].length > 0) {
       curr.cities[i].forEach((it) => {
         lis = [
           ...lis,
-          { key: curr.tz, value: `${curr.countries[i]} - ${it}`, offset: getTimeZoneOffsetInHours(curr.tz) },
+          { key: curr.tz, value: `${curr.countries[i]} - ${it}`, offset: offsetString },
         ];
       });
-    } else {
-      lis = [...lis, { key: curr.tz, value: `${curr.countries[i]}` , offset: getTimeZoneOffsetInHours(curr.tz)}];
-    }
+  }else{
+    lis = [...lis, { key: curr.tz, value: `${curr.countries[i]} - ${curr.tzName}` , offset: offsetString}];
   }
-  return [...prev, ...lis];
+}
+return [...prev, ...lis]
 }, [])

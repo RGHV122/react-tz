@@ -1,14 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState,useRef, useEffect, useMemo } from 'react';
 import { DateTime } from 'luxon';
-import { timezones, timezoneList } from '../utils/timedata';        
+import { timezoneList } from '../utils/timedata';        
 
 export default function TimezoneConverter() {
   const [clocks, setClocks] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [is24Hour, setIs24Hour] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [filteredTimezones, setFilteredTimezones] = useState([]);
   const [focusedClockId, setFocusedClockId] = useState(null);
+  const filteredTimezonesRef = useRef(null); // Add ref for scrollable container
+
+  useEffect(() => {
+    if (filteredTimezonesRef.current) {
+      filteredTimezonesRef.current.scrollTop = 0; // Scroll to top on searchQuery change
+    }
+  }, [searchQuery]);
 
   useEffect(() => {
     // Set first clock as focused when clocks array changes
@@ -57,17 +63,32 @@ export default function TimezoneConverter() {
 
   const onSearchQueryChange = (value) => {
     setSearchQuery(value);
-    setFilteredTimezones(getFilteredTimezones());
   };
 
   const getFilteredTimezones = () => {
-    const query = searchQuery.toLowerCase();
-    if (!query || query.length === 0) return [];
-
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return [];
+  
     return timezoneList
-      .filter(it => it.value.toLowerCase().includes(query))
-      .sort((a, b) => a.value > b.value ? 1 : -1);
+      .map(tz => {
+        // Calculate match scores based on multiple fields
+        let score = 0;
+        if (tz.abbreviations?.some(abbr => abbr.toLowerCase() == query)) score += 10000; // Match in abbreviations
+        else if(tz.abbreviations?.some(abbr => abbr.toLowerCase().startsWith(query))) score+=4
+
+        if (tz.value.toLowerCase().startsWith(query)) score += 10; // Match in countries
+        else if (tz.value.toLowerCase().includes(query)) score += 3; // Match in display value
+
+        // if (tz.key.toLowerCase().includes(query)) score += 2; // Match in timezone key
+
+          
+        return { ...tz, score };
+      })
+      .filter(tz => tz.score > 0) // Only include matching timezones
+      .sort((a, b) => b.score - a.score || a.value - b.value); // Sort by score and alphabetically
   };
+  const filteredTimezones = useMemo(()=> getFilteredTimezones());
+
 
   const addClock = (timezone) => {
     const dateTime = clocks.length === 0 
@@ -223,7 +244,9 @@ export default function TimezoneConverter() {
           className="w-full p-3 rounded-lg border dark:bg-gray-800 dark:text-white"
         />
         {searchQuery && (
-          <div className="absolute w-full mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg max-h-60 overflow-y-auto z-10">
+          <div
+          ref={filteredTimezonesRef}
+           className="absolute w-full mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg max-h-60 overflow-y-auto z-10">
             {filteredTimezones.map((tz, index) => (
               <div
                 key={index}
